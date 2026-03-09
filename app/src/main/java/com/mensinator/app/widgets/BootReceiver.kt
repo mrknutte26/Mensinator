@@ -17,6 +17,9 @@ class BootReceiver : BroadcastReceiver() {
             CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
                 try {
                     MidnightWorker.scheduleNextMidnight(context)
+                    // Update all widgets immediately after boot so they show current data.
+                    // Without this, widgets keep showing stale data until midnight or the user opens the app.
+                    WidgetInstances.forEach { it.glanceAppWidget.updateAll(context) }
                 } finally {
                     pendingResult.finish()
                 }

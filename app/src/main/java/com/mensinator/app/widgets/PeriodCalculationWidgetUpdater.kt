@@ -36,8 +36,12 @@ object PeriodCalculationWidgetUpdater : KoinComponent {
     private fun updateWidgets() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // Emit to midnight trigger to force widget data refresh
-                MidnightTrigger.midnightTrigger.emit(Unit)
+                // Do NOT emit to MidnightTrigger here.
+                // Emitting before updateAll() could cause the active combine flow to recompose
+                // with the OLD nextPeriod() value (the new value hasn't been emitted by the
+                // nextPeriod() map block yet). updateAll() starts a fresh Glance composition that
+                // re-runs calculateNextPeriod() from scratch via the dbWriteTrigger replay, so the
+                // widget always gets the correct up-to-date data.
                 // Update all widgets concurrently for better performance
                 WidgetInstances.map { receiver ->
                     launch { receiver.glanceAppWidget.updateAll(context) }
