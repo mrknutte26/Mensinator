@@ -1,16 +1,18 @@
 package com.mensinator.app.widgets
 
 import android.content.Context
-import androidx.glance.appwidget.updateAll
 import androidx.work.*
 import java.time.Duration
 import java.time.LocalTime
 import java.time.ZonedDateTime
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.delay
 
 class MidnightWorker(val context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
     companion object {
+        private const val MIDNIGHT_UPDATE_DELAY_MS = 1000L
+
         fun scheduleNextMidnight(context: Context) {
             val now = ZonedDateTime.now()
             // Calculate the next midnight in the current time zone
@@ -35,8 +37,9 @@ class MidnightWorker(val context: Context, params: WorkerParameters) : Coroutine
     }
 
     override suspend fun doWork(): Result {
-        MidnightTrigger.midnightTrigger.emit(Unit)
-        WidgetInstances.forEach { it.glanceAppWidget.updateAll(context) }
+        // Let the date boundary settle before recomputing countdown-based widget text.
+        delay(MIDNIGHT_UPDATE_DELAY_MS)
+        updateAllWidgets(applicationContext)
         // Schedule the next update for the following midnight
         scheduleNextMidnight(applicationContext)
         
