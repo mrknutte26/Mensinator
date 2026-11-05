@@ -20,6 +20,9 @@ import com.mensinator.app.widgets.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
@@ -30,6 +33,10 @@ import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 
 class App : Application() {
+
+    companion object {
+        private const val WIDGET_REFRESH_DEBOUNCE_MS = 250L
+    }
 
     // Koin dependency injection definitions
     private val appModule = module {
@@ -56,14 +63,24 @@ class App : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        startKoin {
+        val koinApplication = startKoin {
             androidLogger()
             androidContext(this@App)
             modules(appModule, WidgetModule)
         }
 
+        observeWidgetUpdates(koinApplication.koin.get<IPeriodDatabaseHelper>())
         MidnightWorker.scheduleNextMidnight(this.applicationContext)
         initWidgetPreviews()
+    }
+
+    private fun observeWidgetUpdates(dbHelper: IPeriodDatabaseHelper) {
+        applicationScope.launch(Dispatchers.IO) {
+            dbHelper.dbWriteTrigger
+                .debounce(WIDGET_REFRESH_DEBOUNCE_MS)
+                .onEach { updateAllWidgets(applicationContext) }
+                .collect()
+        }
     }
 
     private fun initWidgetPreviews() {
